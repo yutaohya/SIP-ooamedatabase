@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>詳細表示</title>
+    <style>
+        body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 20px; background: #fafafa; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-radius: 8px; min-height: 500px; }
+        .error-box { 
+            display: none; 
+            border: 2px solid #dc3545; background-color: #f8d7da; color: #721c24; 
+            padding: 20px; border-radius: 5px; text-align: center; margin-top: 50px;
+        }
+        .error-title { font-size: 1.5em; font-weight: bold; margin-bottom: 10px; }
+        .loading { text-align: center; color: #666; margin-top: 50px; }
+        iframe { width: 100%; height: 800px; border: none; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 id="page-title">詳細データを読み込んでいます...</h2>
+        
+        <div id="loading" class="loading">Loading...</div>
+        
+        <iframe id="content-frame"></iframe>
+
+        <div id="error-box" class="error-box">
+            <div class="error-title">ページが見つかりません</div>
+            <p>指定された事例の詳細ページはまだ作成されていないか、保存されていません。</p>
+            <hr style="border-top: 1px solid #f5c6cb; margin: 15px 0;">
+            <p style="font-weight:bold;">開発者へのリクエスト:</p>
+            <p>「<span id="missing-file-name"></span>」 の詳細ページの作成・配置をお願いします。</p>
+        </div>
+    </div>
+
+    <script>
+        // URLパラメータ解析
+        const params = new URLSearchParams(window.location.search);
+        const dataset = params.get('ds');
+        const id = params.get('id');
+
+        const loadingDiv = document.getElementById('loading');
+        const iframe = document.getElementById('content-frame');
+        const errorBox = document.getElementById('error-box');
+        const title = document.getElementById('page-title');
+        const missingSpan = document.getElementById('missing-file-name');
+
+        if (!dataset || !id) {
+            loadingDiv.style.display = 'none';
+            errorBox.style.display = 'block';
+            errorBox.querySelector('.error-title').textContent = "パラメータエラー";
+            errorBox.querySelector('p').textContent = "URLが不正です。一覧ページから開き直してください。";
+        } else {
+            // 読み込むべきファイルパス (details/Dataset_ID.html)
+            const targetFile = `details/${dataset}_${id}.html`;
+            title.textContent = `${dataset} - No.${id} 詳細`;
+            missingSpan.textContent = targetFile;
+
+            // iframeで読み込みを試みる
+            iframe.src = targetFile;
+            
+            iframe.onload = function() {
+                // ロード成功とみなす (ただし404ページが表示されている可能性もあるが、
+                // ローカルサーバー経由ならJavascriptでの判定はクロスオリジン制限で難しい。
+                // fetchを使うのが一番確実)
+                
+                // iframeの中身にアクセスしてみてエラーかどうか判定する
+                try {
+                    // 同一オリジンであればアクセス可能。404の場合、サーバーによっては中身が取れるが..
+                    // 単純に fetch で存在確認を行うフローに変えます。
+                } catch(e) {
+                    // クロスオリジンエラー等は無視
+                }
+            };
+
+            // fetchで存在確認 (ローカルサーバー必須)
+            fetch(targetFile)
+                .then(response => {
+                    if (response.ok) {
+                        loadingDiv.style.display = 'none';
+                        iframe.style.display = 'block';
+                    } else {
+                        throw new Error('Not found');
+                    }
+                })
+                .catch(err => {
+                    console.log("Fetch failed or file not found:", err);
+                    // 失敗したらエラーボックスを表示
+                    loadingDiv.style.display = 'none';
+                    iframe.style.display = 'none';
+                    errorBox.style.display = 'block';
+                    
+                    // file:// プロトコルの場合の追加メッセージ
+                    if (window.location.protocol === 'file:') {
+                        const note = document.createElement('p');
+                        note.style.fontSize = "0.9em";
+                        note.style.color = "#555";
+                        note.innerHTML = "<br>(注意: ローカルファイルを直接開いているため、ファイルの有無を正しく判定できていない可能性があります。ブラウザのセキュリティ制限により、この機能を使用するにはローカルサーバーの起動が推奨されます)";
+                        errorBox.appendChild(note);
+                    }
+                });
+        }
+    </script>
+</body>
+</html>
